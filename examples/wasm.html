@@ -20,7 +20,7 @@
         };
 
         const file = "point-color.laz";
-        import init, { get_header, init_decompressor, decompress_many } from "../pkg/laz_rs_wasm.js";
+        import init, { WasmLasZipDecompressor } from "../pkg/laz_rs_wasm.js";
 
         init()
             .then(() => {
@@ -30,26 +30,21 @@
                             .then((buf) => {
                                 // Uint8Array of the file
                                 var abInt = new Uint8Array(buf);
-                                // Contains QuickHeader info, not needed for decompression
-                                var header = get_header(abInt);
+                                
+                                var decompressor = new WasmLasZipDecompressor(abInt);
 
-                                console.log(header);
-                                console.log("Point format: " + header.point_format_id);
-                                console.log("Number of points: " + header.num_points);
+                                console.log(decompressor);
+                                console.log("Point format: " + decompressor.header.point_format_id);
+                                console.log("Number of points: " + decompressor.header.num_points);
 
-                                // This returns a WasmLasZipDecompressor object, which has read the laz VLR
-                                // and initialized LasZipDecompressor
-                                var decomp = init_decompressor(abInt);
-                                console.log(decomp);
-
-                                var uncompressed_pointformat = header.point_format_id & 0x3f;
+                                var uncompressed_pointformat = decompressor.header.point_format_id & 0x3f;
 
                                 // We can iterate points one by one if we want, or we can make a Uint8Array
                                 // of size (header.point_size * header.num_points) and decompress them all at once
-                                var out = new Uint8Array(header.point_size);
+                                var out = new Uint8Array(decompressor.header.point_size);
                                 // Decompress the first 10 points
                                 for (var i = 0; i < 10; i++) {
-                                    decompress_many(decomp, out);
+                                    decompressor.decompress_many(out);
                                     
                                     var dv = new DataView(out.buffer);
                                     console.log(pointFormatReaders[uncompressed_pointformat](dv));

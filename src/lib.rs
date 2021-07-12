@@ -5,6 +5,7 @@ use std::io::Seek;
 extern crate console_error_panic_hook;
 
 #[wasm_bindgen]
+#[derive(Copy, Clone)]
 pub struct WasmQuickHeader {
     pub major: u8,
     pub minor: u8,
@@ -32,52 +33,35 @@ impl From<QuickHeader> for WasmQuickHeader {
 }
 
 #[wasm_bindgen]
-pub fn get_header(buf: js_sys::Uint8Array)  -> std::result::Result<WasmQuickHeader, JsValue> {
-    // initialize debugging
-    console_error_panic_hook::set_once();
-
-    // copy header bytes into wasm memory
-    let mut body = vec![0; buf.length() as usize];
-    buf.copy_to(&mut body[..]);
-    // cursor to wrap the bytes
-    let mut cursor = std::io::Cursor::new(body);
-    let hdr = QuickHeader::read_from(&mut cursor).unwrap();
-    Ok(WasmQuickHeader::from(hdr))
+pub struct WasmLasZipDecompressor {
+    decompressor: LasZipDecompressor<'static, std::io::Cursor<Vec<u8>>>,
+    pub header: WasmQuickHeader
 }
 
 #[wasm_bindgen]
-pub struct WasmLasZipDecompressor {
-    decompressor: LasZipDecompressor<'static, std::io::Cursor<Vec<u8>>>,
-}
-
 impl WasmLasZipDecompressor {
-    pub fn new(source: Vec<u8>) -> Self {        
-        let mut cursor = std::io::Cursor::new(source);
+    #[wasm_bindgen(constructor)]
+    pub fn new(buf: js_sys::Uint8Array) -> Self {      
+        console_error_panic_hook::set_once();
+          
+        let mut cursor = std::io::Cursor::new(buf.to_vec());
 
-        let hdr = QuickHeader::read_from(&mut cursor).unwrap();
+        let hdr = QuickHeader::read_from(&mut cursor).unwrap_throw();
         
-        cursor.seek(std::io::SeekFrom::Start(hdr.header_size as u64));
+        cursor.seek(std::io::SeekFrom::Start(hdr.header_size as u64)).unwrap_throw();
         let laz_vlr = read_vlrs_and_get_laszip_vlr(&mut cursor, &hdr);
 
-        cursor.seek(std::io::SeekFrom::Start(hdr.offset_to_points as u64));
-        let decomp = LasZipDecompressor::new(cursor, laz_vlr.expect("Compressed data, but no Laszip Vlr found")).unwrap();
+        cursor.seek(std::io::SeekFrom::Start(hdr.offset_to_points as u64)).unwrap_throw();
+        let decomp = LasZipDecompressor::new(cursor, laz_vlr.expect("Compressed data, but no Laszip Vlr found")).unwrap_throw();
 
         Self {
             decompressor: decomp,
+            header: WasmQuickHeader::from(hdr)
         }
     }
 
-    pub fn decompress_many(&mut self, out: &mut [u8]) -> std::io::Result<()> {
-        Ok(self.decompressor.decompress_many(out)?)
+    pub fn decompress_many(&mut self, out: &mut [u8]) -> Result<(), JsValue> {
+        self.decompressor.decompress_many(out).unwrap_throw();
+        Ok(())
     }
 }
-
-#[wasm_bindgen]
-pub fn init_decompressor(buf: js_sys::Uint8Array)  -> WasmLasZipDecompressor  {
-    WasmLasZipDecompressor::new(buf.to_vec())
-}
-
-#[wasm_bindgen]
-pub fn decompress_many(decompressor: &mut WasmLasZipDecompressor, out: &mut [u8]) {
-    decompressor.decompressor.decompress_many(out);
-} 
