@@ -49,6 +49,8 @@
                                     var dv = new DataView(out.buffer);
                                     console.log(pointFormatReaders[uncompressed_pointformat](dv));
                                 }
+                                // free to avoid memory leak
+                                decompressor.free();
                             });
                     });
             });
