@@ -10,12 +10,25 @@
     <script type="module">
         import init, { WasmLasZipDecompressor } from "../pkg/laz_rs_wasm.js";
 
-        var emptyArrayBuff = new ArrayBuffer(200)
-        var abInt = new Uint8Array(emptyArrayBuff);
-
         init()
             .then(() => {
-                var decompressor = new WasmLasZipDecompressor(abInt);
+                try {
+                    var emptyArrayBuff = new ArrayBuffer(20);
+                    var abInt = new Uint8Array(emptyArrayBuff);
+
+                    var decompressor = new WasmLasZipDecompressor(abInt);
+                } catch (e) {
+                    console.log(e);
+                }
+
+                try {
+                    var emptyArrayBuff = new ArrayBuffer(200);
+                    var abInt = new Uint8Array(emptyArrayBuff);
+
+                    var decompressor = new WasmLasZipDecompressor(abInt);
+                } catch (e) {
+                    console.log(e);
+                }
             });
     </script>
 </body>
